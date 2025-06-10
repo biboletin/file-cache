@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="PHPCS">
+	<description>PHPCS config file</description>
+    <arg name="colors"/>
+	<arg name="parallel" value="75"/>
+	<arg value="np"/>
+    <ini name="memory_limit" value="1024M"/>
+	<file>src</file>
+    <exclude-pattern type="relative">*/vendor/*</exclude-pattern>
+	<rule ref="Internal.Tokenizer.Exception">
+		<type>error</type>
+	</rule>
+    <rule ref="Generic.Files.LineEndings">
+		<properties>
+			<property name="eolChar" value="\n"/>
+		</properties>
+	</rule>
+    <!-- <rule ref="PEAR">
+		<exclude name="PEAR.NamingConventions.ValidFunctionName"/>
+		<exclude name="PEAR.NamingConventions.ValidVariableName"/>
+		<exclude name="PEAR.Commenting.ClassComment"/>
+		<exclude name="PEAR.Commenting.FileComment.MissingCategoryTag"/>
+		<exclude name="PEAR.Commenting.FileComment.MissingPackageTag"/>
+		<exclude name="PEAR.Commenting.FileComment.MissingLinkTag"/>
+		<exclude name="PEAR.Commenting.FileComment.MissingVersion"/>
+		<exclude name="PEAR.Commenting.InlineComment"/>
+	</rule> -->
+    <rule ref="Generic.Metrics.CyclomaticComplexity"/>
+    <rule ref="Generic.Metrics.NestingLevel">
+        <properties>
+            <property name="nestingLevel" value="10"/>
+            <property name="absoluteNestingLevel" value="30"/>
+        </properties>
+    </rule>
+    <rule ref="Generic.PHP.ForbiddenFunctions">
+        <properties>
+            <property name="forbiddenFunctions" type="array">
+                <element key="delete" value="unset"/>
+                <element key="dump" value="null"/>
+                <element key="is_null" value="null"/>
+                <element key="print" value="null"/>
+                <element key="print_r" value="null"/>
+                <element key="sizeof" value="count"/>
+                <element key="var_dump" value="null"/>
+                <element key="die" value="null" />
+                <element key="eval" value="null" />
+            </property>
+        </properties>
+    </rule>
+    <rule ref="Generic.PHP.CharacterBeforePHPOpeningTag"/>
+    <rule ref="Generic.PHP.DisallowAlternativePHPTags"/>
+    <rule ref="Generic.PHP.DisallowRequestSuperglobal" />
+    <rule ref="Generic.PHP.DiscourageGoto"/>
+    <rule ref="Generic.PHP.SAPIUsage"/>
+    <rule ref="Generic.PHP.Syntax"/>
+    <rule ref="Generic.NamingConventions.ConstructorName"/>
+	<rule ref="Generic.NamingConventions.UpperCaseConstantName"/>
+	<rule ref="Generic.NamingConventions.CamelCapsFunctionName"/>
+	<rule ref="Generic.PHP.LowerCaseKeyword"/>
+	<rule ref="Generic.PHP.DeprecatedFunctions"/>
+	<rule ref="Generic.PHP.DisallowShortOpenTag"/>
+	<rule ref="Generic.PHP.ForbiddenFunctions"/>
+	<rule ref="Generic.PHP.LowerCaseConstant"/>
+	<rule ref="Generic.PHP.NoSilencedErrors"/>
+	<rule ref="Generic.Strings.UnnecessaryStringConcat"/>
+    <rule ref="Generic.Formatting.DisallowMultipleStatements"/>
+    <rule ref="Generic.PHP.LowerCaseType"/>
+	<rule ref="Generic.Arrays.ArrayIndent"/>
+	<rule ref="Generic.Arrays.DisallowLongArraySyntax"/>
+    <rule ref="Generic.CodeAnalysis.EmptyPHPStatement"/>
+    <rule ref="Generic.CodeAnalysis.EmptyStatement"/>
+    <rule ref="Generic.CodeAnalysis.ForLoopWithTestFunctionCall"/>
+    <rule ref="Generic.CodeAnalysis.UnconditionalIfStatement"/>
+    <rule ref="Generic.CodeAnalysis.UnnecessaryFinalModifier"/>
+    <rule ref="Generic.CodeAnalysis.UnusedFunctionParameter"/>
+    <rule ref="Generic.CodeAnalysis.UselessOverridingMethod"/>
+    <rule ref="Generic.Commenting.DocComment"/>
+    <rule ref="Generic.Files.ByteOrderMark"/>
+    <rule ref="Generic.ControlStructures.DisallowYodaConditions"/>
+    <rule ref="Generic.ControlStructures.InlineControlStructure"/>
+    <rule ref="Generic.WhiteSpace.DisallowTabIndent"/>
+
+    <rule ref="Squiz.PHP.DisallowSizeFunctionsInLoops"/>
+    <rule ref="Squiz.PHP.Eval"/>
+    <rule ref="Squiz.PHP.EmbeddedPhp"/>
+    <rule ref="Squiz.PHP.GlobalKeyword"/>
+    <rule ref="Squiz.PHP.InnerFunctions"/>
+    <rule ref="Squiz.PHP.LowercasePHPFunctions"/>
+    <rule ref="Squiz.PHP.NonExecutableCode"/>
+    <rule ref="Squiz.Scope.MemberVarScope"/>
+    <rule ref="Squiz.Scope.MethodScope"/>
+    <rule ref="Squiz.Scope.StaticThisUsage"/>
+    <rule ref="Squiz.Strings.DoubleQuoteUsage"/>
+    <rule ref="Squiz.Strings.ConcatenationSpacing">
+        <exclude name="Squiz.Strings.ConcatenationSpacing.PaddingFound" />
+    </rule>
+    <rule ref="Squiz.PHP.CommentedOutCode"/>
+	<rule ref="Squiz.PHP.DiscouragedFunctions"/>
+	<rule ref="Squiz.PHP.Eval"/>
+	<rule ref="Squiz.PHP.GlobalKeyword"/>
+	<rule ref="Squiz.PHP.InnerFunctions"/>
+	<rule ref="Squiz.PHP.LowercasePHPFunctions"/>
+	<rule ref="Squiz.Scope.MemberVarScope"/>
+	<rule ref="Squiz.Scope.MethodScope"/>
+	<rule ref="Squiz.Scope.StaticThisUsage"/>
+	<rule ref="Squiz.WhiteSpace.ScopeKeywordSpacing"/>
+	<rule ref="Squiz.Arrays.ArrayDeclaration.KeyNotAligned">
+        <severity>0</severity>
+    </rule>
+    <rule ref="Squiz.Arrays.ArrayDeclaration.ValueNotAligned">
+        <severity>0</severity>
+    </rule>
+    <rule ref="Squiz.Arrays.ArrayDeclaration.CloseBraceNotAligned">
+        <severity>0</severity>
+    </rule>
+    <rule ref="Squiz.Arrays.ArrayDeclaration.CloseBraceNewLine">
+        <severity>0</severity>
+    </rule>
+	<rule ref="Squiz.Arrays.ArrayDeclaration"/>
+    <rule ref="Squiz.PHP.NonExecutableCode"/>
+    <rule ref="Squiz.Classes.LowercaseClassKeywords"/>
+    <rule ref="Squiz.Commenting.BlockComment"/>
+    <rule ref="Squiz.Operators.ValidLogicalOperators"/>
+    <rule ref="Squiz.Operators.IncrementDecrementUsage"/>
+    <!-- <rule ref="Squiz.Operators.ComparisonOperatorUsage"/> -->
+    <rule ref="Squiz.Strings.EchoedStrings"/>
+
+    <rule ref="MySource.PHP.EvalObjectFactory"/>
+	<rule ref="MySource.PHP.ReturnFunctionValue"/>
+
+    <rule ref="PEAR.Classes.ClassDeclaration"/>
+
+    <rule ref="PSR1.Classes.ClassDeclaration"/>
+    <rule ref="PSR1.Files.SideEffects"/>
+
+    <rule ref="PSR2.Classes.ClassDeclaration"/>
+	<rule ref="PSR2.Classes.PropertyDeclaration"/>
+	<rule ref="PSR2.ControlStructures.ControlStructureSpacing"/>
+	<rule ref="PSR2.ControlStructures.ElseIfDeclaration"/>
+	<rule ref="PSR2.Files.EndFileNewline"/>
+	<rule ref="PSR2.Methods.MethodDeclaration"/>
+	<rule ref="PSR2.Namespaces.NamespaceDeclaration"/>
+	<rule ref="PSR2.Namespaces.UseDeclaration"/>
+
+    <rule ref="Zend.Files.ClosingTag"/>
+
+    <rule ref="PSR12"/>
+<!--	<rule ref="PHPCompatibility"/>-->
+
+    <rule ref="PHPCompatibility">
+        <exclude name="PHPCompatibility.Variables.ForbiddenThisUseContexts.OutsideObjectContext"/>
+    </rule>
+
+</ruleset>

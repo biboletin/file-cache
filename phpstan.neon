@@ -1,0 +1,13 @@
+parameters:
+    level: 8
+    paths:
+        - src
+    earlyTerminatingMethodCalls:
+        Nette\Application\UI\Presenter:
+            - redirect
+            - redirectUrl
+            - sendJson
+            - sendResponse
+    excludePaths:
+        - vendor/*
+        - tests/*

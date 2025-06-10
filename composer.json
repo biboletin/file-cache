@@ -1,11 +1,12 @@
 {
-    "name": "bibo/file-cache",
+    "name": "biboletin/file-cache",
     "description": "File cache",
     "type": "library",
     "license": "MIT",
+    "version": "1.0.0",
     "autoload": {
         "psr-4": {
-            "Bibo\\FileCache\\": "src/"
+            "Biboletin\\FileCache\\": "src/"
         }
     },
     "authors": [
@@ -15,5 +16,14 @@
         }
     ],
     "minimum-stability": "dev",
-    "require": {}
+    "require-dev": {
+        "symfony/var-dumper": "7.3.x-dev",
+        "squizlabs/php_codesniffer": "*",
+        "phpstan/phpstan": "2.1.x-dev",
+        "vimeo/psalm": "^7.0@dev",
+        "phpunit/phpunit": "^12"
+    },
+    "require": {
+        "psr/simple-cache": "^3.0@dev"
+    }
 }

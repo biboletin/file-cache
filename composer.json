@@ -24,6 +24,8 @@
         "phpunit/phpunit": "^12"
     },
     "require": {
-        "psr/simple-cache": "^3.0@dev"
+        "psr/simple-cache": "^3.0@dev",
+        "ext-openssl": "*",
+        "ext-http": "*"
     }
 }

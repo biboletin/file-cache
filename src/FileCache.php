@@ -2,10 +2,12 @@
 
 namespace Biboletin\FileCache;
 
+use http\Exception\RuntimeException;
 use InvalidArgumentException;
 use Psr\SimpleCache\CacheInterface;
 use DateInterval;
 use DateTime;
+use Random\RandomException;
 use Throwable;
 
 /**
@@ -31,6 +33,20 @@ class FileCache implements CacheInterface
     protected int $defaultTtl;
 
     /**
+     * The cipher method used for encryption.
+     *
+     * @var string
+     */
+    protected string $cipher = 'aes-256-cbc';
+
+    /**
+     * The encryption key used for encrypting cache items.
+     *
+     * @var string
+     */
+    protected string $encryptionKey = '';
+
+    /**
      * FileCache constructor.
      *
      * @param string $cacheDir   The directory where cache files will be stored.
@@ -38,10 +54,11 @@ class FileCache implements CacheInterface
      *
      * @throws InvalidArgumentException If the cache directory is not writable.
      */
-    public function __construct(string $cacheDir, int $defaultTtl = 3600)
+    public function __construct(string $cacheDir, string $encryptionKey, int $defaultTtl = 3600)
     {
         $this->cacheDir = rtrim($cacheDir, '/') . '/';
         $this->defaultTtl = $defaultTtl;
+        $this->encryptionKey = hash('sha256', $encryptionKey, true);
 
         if (!is_dir($cacheDir)) {
             mkdir($cacheDir, 0777, true);
@@ -121,9 +138,15 @@ class FileCache implements CacheInterface
                 return $default;
             }
 
-            $data = unserialize(file_get_contents($file) ?: '');
+            $rawData = file_get_contents($file);
+            if ($rawData === false) {
+                return $default;
+            }
 
-            if ($data === false || !is_array($data) || !isset($data['value'], $data['expiration'])) {
+            $serialized = $this->decrypt($rawData);
+            $data = unserialize($serialized);
+
+            if (!is_array($data) || !isset($data['value'], $data['expiration'])) {
                 return $default;
             }
 
@@ -160,7 +183,8 @@ class FileCache implements CacheInterface
                 'expiration' => $expiration,
             ];
 
-            $encodedData = serialize($data);
+            $encodedData = $this->encrypt(serialize($data));
+            chmod($file, 0777);
 
             return file_put_contents($file, $encodedData) !== false;
         } catch (Throwable $e) {
@@ -223,9 +247,45 @@ class FileCache implements CacheInterface
      */
     public function getMultiple(iterable $keys, mixed $default = null): iterable
     {
+        if (!is_iterable($keys)) {
+            throw new InvalidArgumentException('Keys must be iterable.');
+        }
+
         $results = [];
+
         foreach ($keys as $key) {
-            $results[$key] = $this->get($key, $default);
+            try {
+                $this->validateKey($key);
+                $file = $this->getFilePath($key);
+
+                if (!file_exists($file)) {
+                    $results[$key] = $default;
+                    continue;
+                }
+
+                $rawData = file_get_contents($file);
+                if ($rawData === false) {
+                    $results[$key] = $default;
+                    continue;
+                }
+
+                $serialized = $this->decrypt($rawData);
+                $data = unserialize($serialized);
+
+                if (
+                    !is_array($data) ||
+                    !isset($data['value'], $data['expiration']) ||
+                    $data['expiration'] < time()
+                ) {
+                    $this->delete($key); // Clean up expired
+                    $results[$key] = $default;
+                    continue;
+                }
+
+                $results[$key] = $data['value'];
+            } catch (Throwable) {
+                $results[$key] = $default;
+            }
         }
 
         return $results;
@@ -270,7 +330,12 @@ class FileCache implements CacheInterface
 
         $success = true;
         foreach ($keys as $key) {
-            if (!$this->delete($key)) {
+            try {
+                $this->validateKey($key);
+                if (!$this->delete($key)) {
+                    $success = false;
+                }
+            } catch (Throwable) {
                 $success = false;
             }
         }
@@ -305,5 +370,111 @@ class FileCache implements CacheInterface
         } catch (Throwable $e) {
             return false;
         }
+    }
+
+    /**
+     * Purges expired cache items.
+     *
+     * This method scans the cache directory and removes files that are expired
+     * or corrupted. It returns true if all deletions were successful, false otherwise.
+     *
+     * @return bool True on success, false on failure.
+     */
+    public function purge(): bool
+    {
+        $success = true;
+
+        foreach (glob($this->cacheDir . '/*') ?? [] as $file) {
+            if (!is_file($file)) {
+                continue;
+            }
+
+            try {
+                $rawData = file_get_contents($file);
+                if ($rawData === false) {
+                    continue;
+                }
+
+                $serialized = $this->decrypt($rawData);
+                $data = unserialize($serialized);
+
+                if (
+                    !is_array($data) ||
+                    !isset($data['expiration']) ||
+                    $data['expiration'] < time()
+                ) {
+                    if (!unlink($file)) {
+                        $success = false;
+                    }
+                }
+            } catch (Throwable) {
+                // Corrupted or unreadable file — try deleting
+                if (!unlink($file)) {
+                    $success = false;
+                }
+            }
+        }
+
+        return $success;
+    }
+
+    /**
+     * Encrypts the given data using the configured cipher and encryption key.
+     *
+     * @param string $data The data to encrypt.
+     *
+     * @return string The encrypted data, base64-encoded.
+     * @throws RuntimeException If encryption fails.
+     * @throws RandomException
+     */
+    protected function encrypt(string $data): string
+    {
+        if ($this->encryptionKey === '') {
+            return $data;
+        }
+
+        $ivLength = openssl_cipher_iv_length($this->cipher);
+        if ($ivLength === false) {
+            throw new RuntimeException('Invalid cipher method ' . $this->cipher . '.');
+        }
+        $iv = random_bytes($ivLength);
+        $encryptedData = openssl_encrypt($data, $this->cipher, $this->encryptionKey, 0, $iv);
+        if ($encryptedData === false) {
+            throw new RuntimeException('Encryption failed.');
+        }
+
+        return base64_encode($iv . $encryptedData); // Prepend IV for decryption
+    }
+
+    /**
+     * Decrypts the given data using the configured cipher and encryption key.
+     *
+     * @param string $data The base64-encoded encrypted data to decrypt.
+     *
+     * @return string The decrypted data.
+     * @throws RuntimeException If decryption fails or if the data is invalid.
+     */
+    protected function decrypt(string $data): string
+    {
+        if ($this->encryptionKey === '') {
+            return $data;
+        }
+
+        $decodedData = base64_decode($data, true);
+        if ($decodedData === false) {
+            throw new RuntimeException('Decoding failed.');
+        }
+        $ivLength = openssl_cipher_iv_length($this->cipher);
+        if ($ivLength === false || strlen($decodedData) < $ivLength) {
+            throw new RuntimeException('Invalid data length for decryption.');
+        }
+        $iv = substr($decodedData, 0, $ivLength);
+        $encryptedData = substr($decodedData, $ivLength);
+        $decryptedData = openssl_decrypt($encryptedData, $this->cipher, $this->encryptionKey, 0, $iv);
+        if ($decryptedData === false) {
+            throw new RuntimeException('Decryption failed.');
+        }
+
+        return $decryptedData;
     }
 }

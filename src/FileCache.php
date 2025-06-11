@@ -30,7 +30,14 @@ class FileCache implements CacheInterface
      *
      * @var int
      */
-    protected int $defaultTtl;
+    protected int $defaultTtl = 3600;
+    
+    /**
+     * The time-to-live (TTL) for cache items in seconds.
+     *
+     * @var int
+     */
+    protected int $ttl = 3600;
 
     /**
      * The cipher method used for encryption.
@@ -49,15 +56,14 @@ class FileCache implements CacheInterface
     /**
      * FileCache constructor.
      *
-     * @param string $cacheDir   The directory where cache files will be stored.
-     * @param int    $defaultTtl The default time-to-live for cache items in seconds.
-     *
-     * @throws InvalidArgumentException If the cache directory is not writable.
+     * @param string   $cacheDir The directory where cache files will be stored.
+     * @param string   $encryptionKey
+     * @param int|null $ttl
      */
-    public function __construct(string $cacheDir, string $encryptionKey, int $defaultTtl = 3600)
+    public function __construct(string $cacheDir, string $encryptionKey, ?int $ttl = null)
     {
         $this->cacheDir = rtrim($cacheDir, '/') . '/';
-        $this->defaultTtl = $defaultTtl;
+        $this->ttl = ($ttl !== null) ? $ttl : $this->defaultTtl;
         $this->encryptionKey = hash('sha256', $encryptionKey, true);
 
         if (!is_dir($cacheDir)) {
@@ -82,7 +88,7 @@ class FileCache implements CacheInterface
         $this->validateKey($key);
         $hashedKey = hash('sha256', $key);
 
-        return $this->cacheDir . DIRECTORY_SEPARATOR . $hashedKey . '.cache';
+        return $this->getCacheDirectory() . DIRECTORY_SEPARATOR . $hashedKey . '.cache';
     }
 
     /**
@@ -106,7 +112,7 @@ class FileCache implements CacheInterface
      *
      * @return int The expiration timestamp.
      */
-    public function getExpirationTimestamp($ttl): int
+    public function getExpirationTimestamp(DateInterval|int|null $ttl): int
     {
         if ($ttl instanceof DateInterval) {
             $now = new DateTime();
@@ -224,7 +230,7 @@ class FileCache implements CacheInterface
     public function clear(): bool
     {
         try {
-            $files = glob($this->cacheDir . '*.cache') ?: [];
+            $files = glob($this->getCacheDirectory() . '*.cache') ?: [];
 
             foreach ($files as $file) {
                 if (is_file($file)) {
@@ -243,7 +249,7 @@ class FileCache implements CacheInterface
      * @param iterable<string, mixed> $keys    The cache keys.
      * @param mixed|null              $default The default value to return if a cache item does not exist.
      *
-     * @return iterable An associative array of key-value pairs.
+     * @return iterable<string, mixed> An associative array of key-value pairs.
      */
     public function getMultiple(iterable $keys, mixed $default = null): iterable
     {
@@ -384,7 +390,7 @@ class FileCache implements CacheInterface
     {
         $success = true;
 
-        foreach (glob($this->cacheDir . '/*') ?? [] as $file) {
+        foreach (glob($this->getCacheDirectory() . '/*') as $file) {
             if (!is_file($file)) {
                 continue;
             }
@@ -429,16 +435,16 @@ class FileCache implements CacheInterface
      */
     protected function encrypt(string $data): string
     {
-        if ($this->encryptionKey === '') {
+        if ($this->getEncryptionKey() === '') {
             return $data;
         }
 
-        $ivLength = openssl_cipher_iv_length($this->cipher);
+        $ivLength = openssl_cipher_iv_length($this->getCipher());
         if ($ivLength === false) {
-            throw new RuntimeException('Invalid cipher method ' . $this->cipher . '.');
+            throw new RuntimeException('Invalid cipher method ' . $this->getCipher() . '.');
         }
         $iv = random_bytes($ivLength);
-        $encryptedData = openssl_encrypt($data, $this->cipher, $this->encryptionKey, 0, $iv);
+        $encryptedData = openssl_encrypt($data, $this->getCipher(), $this->getEncryptionKey(), 0, $iv);
         if ($encryptedData === false) {
             throw new RuntimeException('Encryption failed.');
         }
@@ -464,17 +470,159 @@ class FileCache implements CacheInterface
         if ($decodedData === false) {
             throw new RuntimeException('Decoding failed.');
         }
-        $ivLength = openssl_cipher_iv_length($this->cipher);
+        $ivLength = openssl_cipher_iv_length($this->getcipher());
         if ($ivLength === false || strlen($decodedData) < $ivLength) {
             throw new RuntimeException('Invalid data length for decryption.');
         }
         $iv = substr($decodedData, 0, $ivLength);
         $encryptedData = substr($decodedData, $ivLength);
-        $decryptedData = openssl_decrypt($encryptedData, $this->cipher, $this->encryptionKey, 0, $iv);
+        $decryptedData = openssl_decrypt($encryptedData, $this->getCipher(), $this->encryptionKey, 0, $iv);
         if ($decryptedData === false) {
             throw new RuntimeException('Decryption failed.');
         }
 
         return $decryptedData;
+    }
+
+    /**
+     * Sets the cipher method for encryption.
+     * This method allows you to specify the cipher method used for encrypting cache items.
+     * It validates the cipher method against the available OpenSSL cipher methods.
+     * If the cipher method is invalid, it throws an InvalidArgumentException.
+     *
+     * @param string $cipher The cipher method to use (e.g., 'aes-256-cbc').
+     *
+     * @throws InvalidArgumentException If the cipher method is invalid.
+     */
+    public function setCipher(string $cipher): void
+    {
+        if (!in_array($cipher, openssl_get_cipher_methods())) {
+            throw new InvalidArgumentException('Invalid cipher method: ' . $cipher);
+        }
+        $this->cipher = $cipher;
+    }
+
+    /**
+     * Sets the cache directory.
+     * This method allows you to specify the directory where cache files will be stored.
+     * It validates that the directory exists and is writable.
+     *
+     * @param string $cacheDir The directory where cache files will be stored.
+     *
+     * @throws InvalidArgumentException If the directory does not exist or is not writable.
+     */
+    public function setCacheDirectory(string $cacheDir): void
+    {
+        if (!is_dir($cacheDir) || !is_writable($cacheDir)) {
+            throw new InvalidArgumentException('Cache directory must be a writable directory.');
+        }
+        $this->cacheDir = rtrim($cacheDir, '/') . '/';
+    }
+
+    /**
+     * Sets the encryption key.
+     * This method allows you to specify the encryption key used for encrypting cache items.
+     * The key is hashed using SHA-256 to ensure it is of the correct length for AES-256 encryption.
+     *
+     * @param string $encryptionKey The encryption key to use.
+     */
+    public function setEncryptionKey(string $encryptionKey): void
+    {
+        $this->encryptionKey = hash('sha256', $encryptionKey, true);
+    }
+
+    /**
+     * Sets the default time-to-live (TTL) for cache items.
+     * This method allows you to specify the default TTL for cache items in seconds.
+     * If the TTL is negative, it throws an InvalidArgumentException.
+     *
+     * @param int $ttl The default TTL in seconds.
+     *
+     * @throws InvalidArgumentException If the TTL is negative.
+     */
+    public function setTtl(int $ttl): void
+    {
+        if ($ttl < 0) {
+            throw new InvalidArgumentException('TTL must be a non-negative integer.');
+        }
+        $this->defaultTtl = $ttl;
+    }
+
+    /**
+     * Gets the cache directory.
+     * This method returns the directory where cache files are stored.
+     *
+     * @return string The cache directory.
+     */
+    public function getCacheDirectory(): string
+    {
+        return $this->cacheDir;
+    }
+
+    /**
+     * Gets the encryption key.
+     * This method returns the encryption key used for encrypting cache items.
+     *
+     * @return string The encryption key.
+     */
+    public function getEncryptionKey(): string
+    {
+        return $this->encryptionKey;
+    }
+
+    /**
+     * Gets the cipher method used for encryption.
+     * This method returns the cipher method used for encrypting cache items.
+     *
+     * @return string The cipher method.
+     */
+    public function getCipher(): string
+    {
+        return $this->cipher;
+    }
+    
+    /**
+     * Gets the default time-to-live (TTL) for cache items.
+     * This method returns the default TTL in seconds.
+     *
+     * @return int The default TTL in seconds.
+     */
+    public function getDefaultTtl(): int
+    {
+        return $this->defaultTtl;
+    }
+
+    /**
+     * Gets the time-to-live (TTL) for cache items.
+     * This method returns the TTL in seconds.
+     *
+     * @return int The TTL in seconds.
+     */
+    public function getTtl(): int
+    {
+        return $this->ttl;
+    }
+
+    /**
+     * Destructor for the FileCache class.
+     *
+     * This method is called when the object is destroyed.
+     * It can be used to perform cleanup tasks, such as purging expired cache items.
+     * However, it's generally better to call purge() explicitly when needed,
+     * as the destructor may not be called immediately or at all in some cases.
+     */
+    public function __destruct()
+    {
+        $this->purge();
+        $this->ttl = $this->defaultTtl; // Reset TTL to default
+        $this->encryptionKey = ''; // Clear encryption key
+        $this->cipher = 'aes-256-cbc'; // Reset cipher to default
+        $this->cacheDir = ''; // Clear cache directory
+        // Note: The destructor is not guaranteed to be called in all cases,
+        // so it's better to call purge() explicitly when needed.
+        // This is just a cleanup step to ensure no sensitive data remains in memory.
+        if (function_exists('gc_collect_cycles')) {
+            gc_collect_cycles(); // Suggest garbage collection
+        }
     }
 }
